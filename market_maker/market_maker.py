@@ -216,18 +216,28 @@ class OrderManager:
             logger.info("Order Manager initializing, connecting to BitMEX. Live run: executing real trades.")
 
         self.start_time = datetime.now()
+        # logger.info("0-0-0-0-0-0-0-0-0-0--------Starting--------0-0-0-0-0-0-0-0-")
         self.instrument = self.exchange.get_instrument()
+        print ("\n\n",self.instrument)
+        logger.info("0-0-0-0-0-0-0-0-0-0--------Instrument printed Successfully--------0-0-0-0-0-0-0-0-")
         self.starting_qty = self.exchange.get_delta()
+        print("\n\n\n", self.starting_qty )
+        logger.info("0-0-0-0-0-0-0-0-0-0--------starting quantity printed Successfully--------0-0-0-0-0-0-0-0-")
         self.running_qty = self.starting_qty
+        print("\n\n\n", self.running_qty)
+        logger.info("0-0-0-0-0-0-0-0-0-0--------running quantity printed Successfully--------0-0-0-0-0-0-0-0-")
         self.reset()
 
     def reset(self):
         self.exchange.cancel_all_orders()
+        # logger.info("0-0-0-0-0-0-0-0-0-0------- All ordres cancelled --------0-0-0-0-0-0-0-0-")
         self.sanity_check()
+        # logger.info("0-0-0-0-0-0-0-0-0-0------- Sanity Check is Done --------0-0-0-0-0-0-0-0-")
         self.print_status()
-
+        # logger.info("0-0-0-0-0-0-0-0-0-0------- Status Printed Successfully --------0-0-0-0-0-0-0-0-")
         # Create orders and converge.
         self.place_orders()
+        # logger.info("0-0-0-0-0-0-0-0-0-0------- Orders Placed --------0-0-0-0-0-0-0-0-")
 
     def print_status(self):
         """Print the current MM status."""
@@ -314,6 +324,7 @@ class OrderManager:
 
         buy_orders = []
         sell_orders = []
+        ''' # commenting for testing
         # Create orders from the outside in. This is intentional - let's say the inner order gets taken;
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
         # a new order is created in the inside. If we did it inside-out, all orders would be amended
@@ -323,7 +334,9 @@ class OrderManager:
                 buy_orders.append(self.prepare_order(-i))
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
-
+        '''
+        buy_orders.append({'price': 5100.0, 'orderQty': 111, 'side': "Buy"})
+        sell_orders.append({'price': 5600.0, 'orderQty': 111, 'side': "Sell"})
         return self.converge_orders(buy_orders, sell_orders)
 
     def prepare_order(self, index):
