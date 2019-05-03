@@ -9,8 +9,10 @@ import atexit
 import signal
 
 from market_maker import bitmex
+
 from market_maker.settings import settings
 from market_maker.utils import log, constants, errors, math
+
 
 # Used for reloading the bot - saves modified times of key files
 import os
@@ -541,8 +543,10 @@ def run():
     logger.info('BitMEX Market Maker Version: %s\n' % constants.VERSION)
 
     om = OrderManager()
+    # order_manager = CustomOrderManager()
     # Try/except just keeps ctrl-c from printing an ugly stacktrace
     try:
         om.run_loop()
+        # order_manager.run_loop()
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
