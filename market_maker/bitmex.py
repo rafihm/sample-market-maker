@@ -54,6 +54,10 @@ class BitMEX(object):
     def exit(self):
         self.ws.exit()
 
+
+    #my custom method
+    def get_all_data(self):
+        return self.ws.get_all_data()
     #
     # Public methods
     #
@@ -90,7 +94,6 @@ class BitMEX(object):
 
         """
         return self.ws.recent_trades()
-
     #
     # Authentication required methods
     #

@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+import time
 from time import sleep
 import sys
 from datetime import datetime
@@ -129,6 +130,15 @@ class ExchangeInterface:
             symbol = self.symbol
         return self.get_position(symbol)['currentQty']
 
+   #my custom function
+    def get_all_data(self, symbol=None):
+        return self.bitmex.get_all_data()
+
+    def get_market_depth(self, symbol=None):
+        if symbol is None:
+            symbol = self.symbol
+        return self.bitmex.market_depth(symbol)
+
     def get_instrument(self, symbol=None):
         if symbol is None:
             symbol = self.symbol
@@ -230,14 +240,14 @@ class OrderManager:
 
     def reset(self):
         self.exchange.cancel_all_orders()
-        # logger.info("0-0-0-0-0-0-0-0-0-0------- All ordres cancelled --------0-0-0-0-0-0-0-0-")
+        logger.info("\n\n\n0-0-0-0-0-0-0-0-0-0------- All ordres cancelled --------0-0-0-0-0-0-0-0-")
         self.sanity_check()
-        # logger.info("0-0-0-0-0-0-0-0-0-0------- Sanity Check is Done --------0-0-0-0-0-0-0-0-")
+        logger.info("\n\n\n0-0-0-0-0-0-0-0-0-0------- Sanity Check is Done --------0-0-0-0-0-0-0-0-")
         self.print_status()
-        # logger.info("0-0-0-0-0-0-0-0-0-0------- Status Printed Successfully --------0-0-0-0-0-0-0-0-")
+        logger.info("\n\n\n0-0-0-0-0-0-0-0-0-0------- Status Printed Successfully --------0-0-0-0-0-0-0-0-")
         # Create orders and converge.
         self.place_orders()
-        # logger.info("0-0-0-0-0-0-0-0-0-0------- Orders Placed --------0-0-0-0-0-0-0-0-")
+        logger.info("\n\n\n0-0-0-0-0-0-0-0-0-0------- Orders Placed --------0-0-0-0-0-0-0-0-")
 
     def print_status(self):
         """Print the current MM status."""
@@ -315,6 +325,146 @@ class OrderManager:
 
         return math.toNearest(start_position * (1 + settings.INTERVAL) ** index, self.instrument['tickSize'])
 
+# =-=-=--=-=-=-=-=-=-=-=-=-custom functions start==p-=-=-=-=-=-=-=-=--=
+    def get_price_history(self, period=None, start_time=None, end_time=None):
+        test_net_url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=5&from=1556882941&to=1556969401'
+        if period is None:
+            period = 1
+
+        if end_time is None:
+            end_time = int(time.time())
+        if start_time is None:
+            start_time = end_time - 84000
+        # for testnet
+        url = 'https://testnet.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=' + str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
+        #uncomment if for real trading
+        # url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=5&from=1556882941&to=1556969401' 
+        def exit_or_throw(e):
+            logger.warning("-=-=-=--=-=-=-=rethrow errorss")
+            # if rethrow_errors:
+            #     raise e
+            # else:
+            #     exit(1)
+
+        def retry():
+            self.retries += 1
+            if self.retries > max_retries:
+                raise Exception("Max retries on %s (%s) hit, raising." % (path, json.dumps(postdict or '')))
+            return self.get_price_history()
+
+        # Make the request
+        response = None
+        try:
+            logger.info("sending req to %s" % (url))
+            response = requests.get(url)
+            # prepped = self.session.prepare_request(req)
+            # response = self.session.send(prepped, timeout=timeout)
+            # Make non-200s throw
+            response.raise_for_status()
+
+        except requests.exceptions.HTTPError as e:
+            if response is None:
+                raise e
+
+            # 401 - Auth error. This is fatal.
+            if response.status_code == 401:
+                logger.error("API Key or Secret incorrect, please check and restart.")
+                logger.error("Error: " + response.text)
+                if postdict:
+                    logger.error(postdict)
+                # Always exit, even if rethrow_errors, because this is fatal
+                exit(1)
+
+            # 404, can be thrown if order canceled or does not exist.
+            elif response.status_code == 404:
+                if verb == 'DELETE':
+                    logger.error("Order not found: %s" % postdict['orderID'])
+                    return
+                logger.error("Unable to contact the BitMEX API (404). " +
+                                  "Request: %s \n %s" % (url, json.dumps(postdict)))
+                exit_or_throw(e)
+
+            # 429, ratelimit; cancel orders & wait until X-RateLimit-Reset
+            elif response.status_code == 429:
+                logger.error("Request Failed with the Error code 429")
+                # logger.error("Ratelimited on current request. Sleeping, then trying again. Try fewer " +
+                #                   "order pairs or contact support@bitmex.com to raise your limits. " +
+                #                   "Request: %s \n %s" % (url, json.dumps(postdict)))
+
+                # # Figure out how long we need to wait.
+                # ratelimit_reset = response.headers['X-RateLimit-Reset']
+                # to_sleep = int(ratelimit_reset) - int(time.time())
+                # reset_str = datetime.datetime.fromtimestamp(int(ratelimit_reset)).strftime('%X')
+
+                # # We're ratelimited, and we may be waiting for a long time. Cancel orders.
+                # logger.warning("Canceling all known orders in the meantime.")
+                # cancel([o['orderID'] for o in self.open_orders()])
+
+                # logger.error("Your ratelimit will reset at %s. Sleeping for %d seconds." % (reset_str, to_sleep))
+                # time.sleep(to_sleep)
+
+                # # Retry the request.
+                # return retry()
+
+            # 503 - BitMEX temporary downtime, likely due to a deploy. Try again
+            elif response.status_code == 503:
+                # logger.warning("Unable to contact the BitMEX API (503), retrying. " +
+                #                     "Request: %s \n %s" % (url, json.dumps(postdict)))
+                # time.sleep(3)
+                logger.error("Request Failed with the Error code 503, retrying")
+                return retry()
+
+            elif response.status_code == 400:
+                logger.error("Request Failed with the Error code 400")
+                # error = response.json()['error']
+                # message = error['message'].lower() if error else ''
+
+                # # Duplicate clOrdID: that's fine, probably a deploy, go get the order(s) and return it
+                # if 'duplicate clordid' in message:
+                #     orders = postdict['orders'] if 'orders' in postdict else postdict
+
+                #     IDs = json.dumps({'clOrdID': [order['clOrdID'] for order in orders]})
+                #     orderResults = self._curl_bitmex('/order', query={'filter': IDs}, verb='GET')
+
+                #     for i, order in enumerate(orderResults):
+                #         if (
+                #                 order['orderQty'] != abs(postdict['orderQty']) or
+                #                 order['side'] != ('Buy' if postdict['orderQty'] > 0 else 'Sell') or
+                #                 order['price'] != postdict['price'] or
+                #                 order['symbol'] != postdict['symbol']):
+                #             raise Exception('Attempted to recover from duplicate clOrdID, but order returned from API ' +
+                #                             'did not match POST.\nPOST data: %s\nReturned order: %s' % (
+                #                                 json.dumps(orders[i]), json.dumps(order)))
+                #     # All good
+                #     return orderResults
+
+                # elif 'insufficient available balance' in message:
+                #     logger.error('Account out of funds. The message: %s' % error['message'])
+                #     exit_or_throw(Exception('Insufficient Funds'))
+
+
+            # If we haven't returned or re-raised yet, we get here.
+            logger.error("Unhandled Error: %s: %s" % (e, response.text))
+            exit_or_throw(e)
+
+        except requests.exceptions.Timeout as e:
+            # Timeout, re-run this request
+            logger.warning("Timed out on request: %s, retrying..." % (path))
+            return retry()
+
+        except requests.exceptions.ConnectionError as e:
+            logger.warning("Unable to contact the BitMEX API (%s). Please check the URL. Retrying. " +
+                                "Request: %s %s \n" % (e, url))
+            time.sleep(1)
+            return retry()
+
+        # Reset retry counter on success
+        self.retries = 0
+
+        return response.json()
+
+    #-=-=-=-=-=-=-=-=-=custom functions end-----0-=-=-=-=-=--=
+
     ###
     # Orders
     ###
@@ -335,8 +485,43 @@ class OrderManager:
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
         '''
-        buy_orders.append({'price': 5100.0, 'orderQty': 111, 'side': "Buy"})
-        sell_orders.append({'price': 5600.0, 'orderQty': 111, 'side': "Sell"})
+        print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-TEST BENCH-==-=-=-=----=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
+        print("\n\n=-=-=-= print  get_instrument")
+        print(self.exchange.get_instrument())
+        print("\n\n=-=-=-= print  get_all_data")
+        print(self.exchange.get_all_data())
+        print("\n\n=-=-=-= print  get_portfolio")
+        print(self.exchange.get_portfolio())
+        print("\n\n=-=-=-= print  calc_delta")
+        print(self.exchange.calc_delta())
+        print("\n\n=-=-=-= print  get_delta")
+        print(self.exchange.get_delta())
+        print("\n\n=-=-=-= print  get_instrument")
+        print(self.exchange.get_instrument())
+        print("\n\n=-=-=-= print  get_margin")
+        print(self.exchange.get_margin())
+        print("\n\n=-=-=-= print  get_orders")
+        print(self.exchange.get_orders())
+        print("\n\n=-=-=-= print  get_highest_buy")
+        print(self.exchange.get_highest_buy())
+        print("\n\n=-=-=-= print  get_lowest_sell")
+        print(self.exchange.get_lowest_sell())
+        print("\n\n=-=-=-= print  get_position")
+        print(self.exchange.get_position())
+        print("\n\n=-=-=-= print get_ticker")
+        print(self.exchange.get_ticker())
+        print("\n\n=-=-=-= print  is_open")
+        print(self.exchange.is_open())
+        print("\n\n=-=-=-= print  check_market_open")
+        print(self.exchange.check_market_open())
+        print("\n\n=-=-=-= print  check_if_orderbook_empty")
+        print(self.exchange.check_if_orderbook_empty())
+        print("\n\n=-=-=-= print  print historyical price")
+        print(self.get_price_history())
+        print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-TEST BENCH SLEEPING-==-=-=-=-----=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
+        sleep(1000)
+        buy_orders.append({'price': 5400.0, 'orderQty': 111, 'side': "Buy"})
+        sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
         return self.converge_orders(buy_orders, sell_orders)
 
     def prepare_order(self, index):
