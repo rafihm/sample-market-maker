@@ -522,7 +522,7 @@ class OrderManager:
         # print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-TEST BENCH SLEEPING-==-=-=-=-----=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
         # # sleep(1000)
 
-        with open('signal.txt', 'r') as content_file:
+        with open('/home/ec2-user/signal.txt', 'r') as content_file:
             content = content_file.read()
 
             signal_content = json.loads(content)
