@@ -8,6 +8,7 @@ import random
 import requests
 import atexit
 import signal
+import json
 
 from market_maker import bitmex
 
@@ -336,9 +337,9 @@ class OrderManager:
         if start_time is None:
             start_time = end_time - 84000
         # for testnet
-        url = 'https://testnet.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=' + str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
+        # url = 'https://testnet.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=' + str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
         #uncomment if for real trading
-        # url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=5&from=1556882941&to=1556969401' 
+        url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution='+ str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
         def exit_or_throw(e):
             logger.warning("-=-=-=--=-=-=-=rethrow errorss")
             # if rethrow_errors:
@@ -485,44 +486,102 @@ class OrderManager:
             if not self.short_position_limit_exceeded():
                 sell_orders.append(self.prepare_order(i))
         '''
-        print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-TEST BENCH-==-=-=-=----=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
-        print("\n\n=-=-=-= print  get_instrument")
-        print(self.exchange.get_instrument())
-        print("\n\n=-=-=-= print  get_all_data")
-        print(self.exchange.get_all_data())
-        print("\n\n=-=-=-= print  get_portfolio")
-        print(self.exchange.get_portfolio())
-        print("\n\n=-=-=-= print  calc_delta")
-        print(self.exchange.calc_delta())
-        print("\n\n=-=-=-= print  get_delta")
-        print(self.exchange.get_delta())
-        print("\n\n=-=-=-= print  get_instrument")
-        print(self.exchange.get_instrument())
-        print("\n\n=-=-=-= print  get_margin")
-        print(self.exchange.get_margin())
-        print("\n\n=-=-=-= print  get_orders")
-        print(self.exchange.get_orders())
-        print("\n\n=-=-=-= print  get_highest_buy")
-        print(self.exchange.get_highest_buy())
-        print("\n\n=-=-=-= print  get_lowest_sell")
-        print(self.exchange.get_lowest_sell())
-        print("\n\n=-=-=-= print  get_position")
-        print(self.exchange.get_position())
-        print("\n\n=-=-=-= print get_ticker")
-        print(self.exchange.get_ticker())
-        print("\n\n=-=-=-= print  is_open")
-        print(self.exchange.is_open())
-        print("\n\n=-=-=-= print  check_market_open")
-        print(self.exchange.check_market_open())
-        print("\n\n=-=-=-= print  check_if_orderbook_empty")
-        print(self.exchange.check_if_orderbook_empty())
-        print("\n\n=-=-=-= print  print historyical price")
-        print(self.get_price_history())
-        print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-TEST BENCH SLEEPING-==-=-=-=-----=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
-        sleep(1000)
-        buy_orders.append({'price': 5400.0, 'orderQty': 111, 'side': "Buy"})
-        sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
+        # print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-TEST BENCH-==-=-=-=----=-=-=-=-=-=-=--=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
+        # print("\n\n=-=-=-= print  get_instrument")
+        # print(self.exchange.get_instrument())
+        # print("\n\n=-=-=-= print  get_all_data")
+        # print(self.exchange.get_all_data())
+        # print("\n\n=-=-=-= print  get_portfolio")
+        # print(self.exchange.get_portfolio())
+        # print("\n\n=-=-=-= print  calc_delta")
+        # print(self.exchange.calc_delta())
+        # print("\n\n=-=-=-= print  get_delta")
+        # print(self.exchange.get_delta())
+        # print("\n\n=-=-=-= print  get_instrument")
+        # print(self.exchange.get_instrument())
+        # print("\n\n=-=-=-= print  get_margin")
+        # print(self.exchange.get_margin())
+        # print("\n\n=-=-=-= print  get_orders")
+        # print(self.exchange.get_orders())
+        # print("\n\n=-=-=-= print  get_highest_buy")
+        # print(self.exchange.get_highest_buy())
+        # print("\n\n=-=-=-= print   get_lowest_sell")
+        # print(self.exchange.get_lowest_sell())
+        # print("\n\n=-=-=-= print  get_position")
+        # print(self.exchange.get_position())
+        # print("\n\n=-=-=-= print get_ticker")
+        # print(self.exchange.get_ticker())
+        # print("\n\n=-=-=-= print  is_open")
+        # print(self.exchange.is_open())
+        # print("\n\n=-=-=-= print  check_market_open")
+        # print(self.exchange.check_market_open())
+        # print("\n\n=-=-=-= print  check_if_orderbook_empty")
+        # print(self.exchange.check_if_orderbook_empty())
+        # print("\n\n=-=-=-= print  print historyical price")
+        # print(self.get_price_history())
+        # print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-TEST BENCH SLEEPING-==-=-=-=-----=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
+        # # sleep(1000)
+
+        with open('signal.txt', 'r') as content_file:
+            content = content_file.read()
+
+            signal_content = json.loads(content)
+        #buy if the singal is 1
+        if signal_content['start'] == 1:
+            print ("=-=-=-=singla buying now -=-=-=-=-=-=-=")
+            order_quantity = 1
+            ticker = self.exchange.get_ticker()
+            print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
+            bid_price = ticker['buy']
+            ask_price = ticker['sell']
+            mid_price = ticker['mid']
+            position = self.exchange.get_position()
+            print("-=-=-=-=-=-=-=open positions is =",position,"-=-=-=-=-=-=-=")
+            open_orders = self.exchange.get_orders()
+            try:
+                
+                print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
+            except:
+                None
+
+            if self.exchange.get_delta() < 1 and not open_orders:
+                buy_orders.append({'price': bid_price-10, 'orderQty': 1, 'side': "Buy"})
+            elif open_orders and float(open_orders[0]['price']) < bid_price:
+                print("Amending a the order")
+                buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
+            # sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
+
+        elif signal_content['start'] == 2:
+            print('=-=-=-=-=-=-=selling now =-=-=-')
+            order_quantity = 1
+            ticker = self.exchange.get_ticker()
+            print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
+            bid_price = ticker['buy']
+            ask_price = ticker['sell']
+            mid_price = ticker['mid']
+            position = self.exchange.get_position()
+            print("-=-=-=-=-=-=-=open positions is =",position,"-=-=-=-=-=-=-=")
+            open_orders = self.exchange.get_orders()
+            try:
+                
+                print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
+            except:
+                None
+
+            running_quantity = self.exchange.get_delta()
+            print("-=-=-=running quantity= ",running_quantity)
+            # if open_orders and float(position['avgEntryPrice']) > ask_price:
+            if running_quantity > 0 and not open_orders:
+                print("s=-=-=-=-= quantity exisit and no open orders ")
+                sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+            elif open_orders and float(open_orders[0]['price'])+10 > ask_price:
+                print("0000000000 =-=-=-=-=-=-=-==-=-=-open order with greater than ask price.")
+                sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+
+        print("=0=-0-0-0-going to return teh order limits")
         return self.converge_orders(buy_orders, sell_orders)
+
+
 
     def prepare_order(self, index):
         """Create an order object."""
