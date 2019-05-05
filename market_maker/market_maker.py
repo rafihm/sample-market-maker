@@ -536,7 +536,7 @@ class OrderManager:
             ask_price = ticker['sell']
             mid_price = ticker['mid']
             position = self.exchange.get_position()
-            print("-=-=-=-=-=-=-=open positions is =",position,"-=-=-=-=-=-=-=")
+            print("-=-=-=-=-=-=-=open positions is = current qty",position['currentQty'],"-=-=-=-=-=-=-=")
             open_orders = self.exchange.get_orders()
             try:
                 
@@ -560,7 +560,7 @@ class OrderManager:
             ask_price = ticker['sell']
             mid_price = ticker['mid']
             position = self.exchange.get_position()
-            print("-=-=-=-=-=-=-=open positions is =",position,"-=-=-=-=-=-=-=")
+            print("-=-=-=-=-=-=-=open positions is, current qty =",position['currentQty'],"-=-=-=-=-=-=-=")
             open_orders = self.exchange.get_orders()
             try:
                 
