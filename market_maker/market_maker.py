@@ -545,7 +545,7 @@ class OrderManager:
                 None
 
             if self.exchange.get_delta() < 1 and not open_orders:
-                buy_orders.append({'price': bid_price-10, 'orderQty': 1, 'side': "Buy"})
+                buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
             elif open_orders and float(open_orders[0]['price']) < bid_price:
                 print("Amending a the order")
                 buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
@@ -574,7 +574,7 @@ class OrderManager:
             if running_quantity > 0 and not open_orders:
                 print("s=-=-=-=-= quantity exisit and no open orders ")
                 sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
-            elif open_orders and float(open_orders[0]['price'])+10 > ask_price:
+            elif open_orders and float(open_orders[0]['price']) > ask_price:
                 print("0000000000 =-=-=-=-=-=-=-==-=-=-open order with greater than ask price.")
                 sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
 
