@@ -470,11 +470,17 @@ class OrderManager:
     # Orders
     ###
 
+    previous_buy_orders = []
+    previous_sell_orders = []
+    buy_orders = []
+    sell_orders = []
+    loop_count = 0
     def place_orders(self):
         """Create order items for use in convergence."""
-
-        buy_orders = []
-        sell_orders = []
+        print("Place Orde Loop Count=",self.loop_count)
+        self.loop_count += 1
+        self.buy_orders = []
+        self.sell_orders = []
         ''' # commenting for testing
         # Create orders from the outside in. This is intentional - let's say the inner order gets taken;
         # then we match orders from the outside in, ensuring the fewest number of orders are amended and only
@@ -525,63 +531,107 @@ class OrderManager:
         with open('/home/ec2-user/signal.txt', 'r') as content_file:
             content = content_file.read()
 
-            signal_content = json.loads(content)
+        signal_content = json.loads(content)
+        print ("Signal File contenet is ",signal_content)
         #buy if the singal is 1
-        if signal_content['start'] == 1:
-            print ("=-=-=-=singla buying now -=-=-=-=-=-=-=")
-            order_quantity = 1
-            ticker = self.exchange.get_ticker()
-            print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
-            bid_price = ticker['buy']
-            ask_price = ticker['sell']
-            mid_price = ticker['mid']
-            position = self.exchange.get_position()
-            print("-=-=-=-=-=-=-=open positions is = current qty",position['currentQty'],"-=-=-=-=-=-=-=")
-            open_orders = self.exchange.get_orders()
-            try:
-                
-                print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
-            except:
-                None
 
-            if self.exchange.get_delta() < 1 and not open_orders:
-                buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
-            elif open_orders and float(open_orders[0]['price']) < bid_price:
-                print("Amending a the order")
-                buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
-            # sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
-
-        elif signal_content['start'] == 2:
-            print('=-=-=-=-=-=-=selling now =-=-=-')
-            order_quantity = 1
-            ticker = self.exchange.get_ticker()
-            print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
-            bid_price = ticker['buy']
-            ask_price = ticker['sell']
-            mid_price = ticker['mid']
-            position = self.exchange.get_position()
-            print("-=-=-=-=-=-=-=open positions is, current qty =",position['currentQty'],"-=-=-=-=-=-=-=")
-            open_orders = self.exchange.get_orders()
-            try:
-                
-                print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
-            except:
-                None
-
-            running_quantity = self.exchange.get_delta()
-            print("-=-=-=running quantity= ",running_quantity)
-            # if open_orders and float(position['avgEntryPrice']) > ask_price:
-            if running_quantity > 0 and not open_orders:
-                print("s=-=-=-=-= quantity exisit and no open orders ")
-                sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
-            elif open_orders and float(open_orders[0]['price']) > ask_price:
-                print("0000000000 =-=-=-=-=-=-=-==-=-=-open order with greater than ask price.")
-                sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
-
-        print("=0=-0-0-0-going to return teh order limits")
-        return self.converge_orders(buy_orders, sell_orders)
+        order_quantity = 1
+        ticker = self.exchange.get_ticker()
+        print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
+        bid_price = ticker['buy']
+        ask_price = ticker['sell']
+        mid_price = ticker['mid']
+        position = self.exchange.get_position()
+        print("-=-=-=-=-=-=-=open positions is = current qty",position['currentQty'], " avg entyr price=", position["avgEntryPrice"], "-=-=-=-=-=-=-=")
+        open_orders = self.exchange.get_orders()
+        running_quantity = self.exchange.get_delta()
+        try:
+            
+            print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
+        except:
+            None
 
 
+        """
+        To bots running in two accounts and one plces buy order and another place sell order at the same time.
+        long_order_bot() is runs on one account aand it palces long order first , 
+        short_order-bot() runs in another account and places short orders.
+        singal.txt file is used to control the bot, value 1 means long in first bot and short in second bot, and vice versa for value 2
+        """
+
+
+
+        def long_order_bot():
+            logger.info("this is SHORT order Bot")
+            # start when the signal.txt file has 1
+            if signal_content['start'] == 1:
+                print ("=-=-=-=singla buying now -=-=-=-=-=-=-=")
+                #no existing contacts and no existing orders then place one order
+                if self.exchange.get_delta() < 1 and not open_orders:
+                    self.buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                # exisitng order is not one the top the order book. ammend the order
+                elif open_orders and float(open_orders[0]['price']) < bid_price:
+                    print("Amending a the order")
+                    self.buy_orders.append({'price': bid_price, 'orderQty': 1, 'side': "Buy"})
+                    self.previous_buy_orders = self.uy_orders
+                # order exists and on top of the order of the orderbook. return the same order. 
+                elif open_orders:
+                    self.buy_orders = self.previous_buy_orders
+                # sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
+
+            elif signal_content['start'] == 2:
+                print('=-=-=-=-=-=-=selling now =-=-=-')
+
+                print("-=-=-=running quantity= ",running_quantity)
+                # if open_orders and float(position['avgEntryPrice']) > ask_price:
+                if running_quantity > 0 and not open_orders:
+                    print("s=-=-=-=-= quantity exisit and no open orders ")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders and float(open_orders[0]['price']) > ask_price:
+                    print("0000000000 =-=-=-=-=-=-=-==-=-=-open order with greater than ask price.")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders:
+                    self.sell_orders = self.previous_sell_orders
+
+            print("=0=-0-0-0-going to return teh order limits")
+
+        def short_order_bot():
+            logger.info("this is SHORT order Bot")
+            if signal_content['start'] == 1:
+                print ("=-=-=-=singla selling now -=-=-=-=-=-=-=")
+                print ("delat avalue is ",self.exchange.get_delta())
+                if self.exchange.get_delta() >= 0 and not open_orders:
+                    print("no short existing and no open orders, creating new orde")
+                    sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders and float(open_orders[0]['price']) > ask_price:
+                    print("Amending a the order")
+                    sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders:
+                    self.sell_orders = self.previous_sell_orders
+
+                # sell_orders.append({'price': 5800.0, 'orderQty': 111, 'side': "Sell"})
+
+            elif signal_content['start'] == 2:
+                print('=-=-=-=-=-=-=selling now =-=-=-')
+
+                print("-=-=-=running quantity= ",running_quantity)
+                # if open_orders and float(position['avgEntryPrice']) > ask_price:
+                if running_quantity > 0 and not open_orders:
+                    print("s=-=-=-=-= quantity exisit and no open orders ")
+                    sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+                elif open_orders and float(open_orders[0]['price']) > ask_price:
+                    print("0000000000 =-=-=-=-=-=-=-==-=-=-open order with greater than ask price.")
+                    sell_orders.append({'price': ask_price, 'orderQty': 1, 'side': "Sell"})
+
+            print("=0=-0-0-0-going to return teh order limits")
+        
+        long_order_bot()
+        return self.converge_orders(self.buy_orders, self.sell_orders)
 
     def prepare_order(self, index):
         """Create an order object."""
