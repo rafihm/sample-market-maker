@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import time
+
 from time import sleep
 import sys
 from datetime import datetime
@@ -14,8 +15,8 @@ from market_maker import bitmex
 
 from market_maker.settings import settings
 from market_maker.utils import log, constants, errors, math
-
-
+import numpy
+import talib
 # Used for reloading the bot - saves modified times of key files
 import os
 watched_files_mtimes = [(f, getmtime(f)) for f in settings.WATCHED_FILES]
@@ -328,15 +329,18 @@ class OrderManager:
 
 # =-=-=--=-=-=-=-=-=-=-=-=-custom functions start==p-=-=-=-=-=-=-=-=--=
     def get_price_history(self, period=None, start_time=None, end_time=None):
-        test_net_url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=5&from=1556882941&to=1556969401'
         if period is None:
             period = 1
 
         if end_time is None:
             end_time = int(time.time())
         if start_time is None:
-            start_time = end_time - 84000
+            # 48000 if period is 10 , 800 data points
+            start_time = end_time - 259200 #777600
+            # one hour graph time with 30 days period
+            # start_time = end_time - 2592000
         # for testnet
+        print("Start Time=", start_time, "Endtime = ", end_time)
         # url = 'https://testnet.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=' + str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
         #uncomment if for real trading
         url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution='+ str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
@@ -464,6 +468,37 @@ class OrderManager:
 
         return response.json()
 
+    def get_current_macd_value(self):
+        logger.info("Calculating the current MACD Value")
+        price_history = self.get_price_history()
+        # print(price_history)
+        close_price_array = numpy.array(price_history['c'])
+        # macd, macdsignal, macdhist = talib.MACD(close_price_array, fastperiod=12, slowperiod=26, signalperiod=9)
+        macd, macdsignal, macdhist = talib.MACD(close_price_array, fastperiod=12, slowperiod=26, signalperiod=9)
+        # ema = talib.EMA(close_price_array, timeperiod=9)
+
+        length = len(macd)
+        print("leng=",length)
+
+        # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
+        # print (ema)
+        # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
+        macd_values = {
+            "macd": macd[length-1],
+            "macdsignal": macdsignal[length-1],
+            "macdhist": macdhist[length-1]
+        }
+
+        print("Latest Price: epoc time", price_history['t'][length-2], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-2])), "Open=" ,price_history['o'][length-2], "High=", price_history['h'][length-2], "Low=", price_history['l'][length-2], "Close=", price_history['c'][length-2])
+        print("Latest Price: epoc time", price_history['t'][length-1], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-1])), "Open=" ,price_history['o'][length-1], "High=", price_history['h'][length-1], "Low=", price_history['l'][length-1], "Close=", price_history['c'][length-1])
+        print("Previous MACD = Macd=",macd[length-5]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-5])
+        print("Previous MACD = Macd=",macd[length-4]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-4])
+        print("Previous MACD = Macd=",macd[length-3]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-3])
+        print("Previous MACD = Macd=",macd[length-2]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-2])
+        print("Current MACD = Macd=",macd[length-1]," macdsignal=",macdsignal[length-1],"macdhist=",macdhist[length-1])
+
+
+        return macd_values
     #-=-=-=-=-=-=-=-=-=custom functions end-----0-=-=-=-=-=--=
 
     ###
@@ -475,6 +510,19 @@ class OrderManager:
     buy_orders = []
     sell_orders = []
     loop_count = 0
+
+    macd_up_flag = 0
+    macd_down_flag = 0
+
+    order_quantity = 1
+    # when trade complete, both buy and sell is done,
+    buy_trade_completed = 0
+    sell_trade_completed = 0
+
+    buy_order_pending = 0
+    sell_order_pending = 0
+
+
     def place_orders(self):
         """Create order items for use in convergence."""
         print("Place Orde Loop Count=",self.loop_count)
@@ -528,14 +576,13 @@ class OrderManager:
         # print('-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=-=-=-=-=-=-TEST BENCH SLEEPING-==-=-=-=-----=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=')
         # # sleep(1000)
 
-        with open('/home/ec2-user/signal.txt', 'r') as content_file:
-            content = content_file.read()
+        # with open('/home/ec2-user/signal.txt', 'r') as content_file:
+        #     content = content_file.read()
 
-        signal_content = json.loads(content)
-        print ("Signal File contenet is ",signal_content)
+        # signal_content = json.loads(content)
+        # print ("Signal File contenet is ",signal_content)
         #buy if the singal is 1
 
-        order_quantity = 1
         ticker = self.exchange.get_ticker()
         print("-=-=-=-=-=-=-=ticker is =",ticker,"-=-=-=-=-=-=-=")
         bid_price = ticker['buy']
@@ -546,12 +593,11 @@ class OrderManager:
         open_orders = self.exchange.get_orders()
         running_quantity = self.exchange.get_delta()
         try:
-            
             print("-=-=-=-=-=-=-=open order is =\norder quantity=",open_orders[0]['orderQty'],"\norder price=", open_orders[0]['price'], "-=-=-=-=-=-=-=")
         except:
             None
 
-
+        # delta = self.exchange.get_delta()
         """
         To bots running in two accounts and one plces buy order and another place sell order at the same time.
         long_order_bot() is runs on one account aand it palces long order first , 
@@ -560,7 +606,7 @@ class OrderManager:
         """
 
 
-
+        """
         def long_order_bot():
             logger.info("this is SHORT order Bot")
             # start when the signal.txt file has 1
@@ -631,6 +677,108 @@ class OrderManager:
             print("=0=-0-0-0-going to return teh order limits")
         
         long_order_bot()
+        """
+
+
+        def get_order_singal():
+            macd_values = self.get_current_macd_value()
+            print("MACD Values from functions = ", macd_values)
+            if self.macd_up_flag == 0 and self.macd_down_flag ==0:
+                if macd_values['macd'] > macd_values['macdsignal']:
+                    self.macd_up_flag = 1
+                else:
+                    self.macd_down_flag = 1
+
+
+            if macd_values['macd'] > macd_values['macdsignal'] and self.macd_down_flag:
+                print ("MACD Crossed - UPTREND")
+                self.macd_up_flag = 1
+                self.macd_down_flag = 0
+                return 1
+
+            elif macd_values['macd'] < macd_values['macdsignal'] and self.macd_up_flag:
+                print ("MACD Crossed - DownTrend")
+                self.macd_down_flag = 1
+                self.macd_up_flag = 0
+                return -1
+
+            if self.macd_up_flag:
+                print("Currently in uptreand. No action required")
+            if self.macd_down_flag:
+                print("Currently in DownTrend. No action required")
+            return 0
+                
+
+        def place_buy_order():
+            print("====Placing Buy order ----")
+            # to check when the trade is complete, if the trade is complete then no more trade is done.
+            if running_quantity < 1 and not open_orders and self.order_signal_status < 1:
+                self.buy_trade_completed = 1
+                self.buy_order_pending = 0
+                print("---Inside order completed loop")
+
+            if not self.buy_trade_completed:
+                print("inside order not completed loop")
+                if running_quantity < 1:
+                    print("inside buy loop")
+                    if not open_orders:
+                        self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                        self.previous_buy_orders = self.buy_orders
+                    elif open_orders and float(open_orders[0]['price']) < bid_price:
+                        print("Amending a the order")
+                        self.buy_orders.append({'price': bid_price, 'orderQty': order_quantity, 'side': "Buy"})
+                        self.previous_buy_orders = self.uy_orders
+                    elif open_orders:
+                        self.buy_orders = self.previous_buy_orders
+                elif running_quantity >= 1:
+                    print("inside sell loop")
+                    pl_delta = ask_price - position["avgEntryPrice"]
+                    print ("Delta Price = ",pl_delta)
+                    if not open_orders and position["avgEntryPrice"] < ask_price:
+                        print("placing the initial sell order")
+                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                        self.previous_sell_orders = self.sell_orders
+                    elif open_orders and float(open_orders[0]['price']) > ask_price and position["avgEntryPrice"] < ask_price:
+                        print("open order with greater than ask price.")
+                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                        self.previous_sell_orders = self.sell_orders
+                    elif pl_delta <= -10 or self.macd_down_flag == 1:
+                        print("inside stoploss loop")
+                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                        self.previous_sell_orders = self.sell_orders
+                    elif open_orders:
+                        print(" no action to sell order")
+                        self.sell_orders = self.previous_sell_orders
+
+        def place_sell_order():
+            print("Placing Sell order ----")
+
+
+        def macd_based_order_generator():
+            self.order_signal_status = get_order_singal()
+            if self.order_signal_status == 1:
+                print ("UPTREND, action need to be taken. Placing order now")
+                place_buy_order()
+                self.buy_order_pending = 1
+            # elif self.order_signal_status == -1:
+            #     print("DownTrend, action needs to be taken")
+            else:
+                print("price is constant-No action needed .coool")
+                if self.buy_order_pending == 1:
+                    #if buy order not completed then call the buy order.
+                    if self.buy_trade_completed == 0:
+                        place_buy_order()
+                    else:
+                        # change the buy order completed to false , so that next order can be placed
+                        self.buy_trade_completed = 0
+                    print("already sent for buying, need call again")
+
+
+        macd_based_order_generator()
+
+
+
+
         return self.converge_orders(self.buy_orders, self.sell_orders)
 
     def prepare_order(self, index):
@@ -807,7 +955,7 @@ class OrderManager:
 
     def run_loop(self):
         while True:
-            sys.stdout.write("-----\n")
+            sys.stdout.write("\n\n\n")
             sys.stdout.flush()
 
             self.check_file_change()
