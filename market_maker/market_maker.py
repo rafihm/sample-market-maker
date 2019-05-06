@@ -507,7 +507,7 @@ class OrderManager:
         # print("Previous MACD = ", price_history['t'][length-2], " Macd=",macd[length-2]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-2])
         # print("Current MACD = ", price_history['t'][length-1], " Macd=",macd[length-1]," macdsignal=",macdsignal[length-1],"macdhist=",macdhist[length-1])
 
-        for i in range(60):
+        for i in range(3):
             i += 1
             print("Latest Price: epoc time", price_history['t'][length-i], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-i])), "Open=" ,price_history['o'][length-i], "High=", price_history['h'][length-i], "Low=", price_history['l'][length-i], "Close=", price_history['c'][length-i])
             print("Current MACD = ", price_history['t'][length-i], " Macd=",macd[length-i]," macdsignal=",macdsignal[length-i]," macdsignal_SMA=",sma[length-i]," macdhist=",macdhist[length-i], "\n")
@@ -526,7 +526,7 @@ class OrderManager:
     loop_count = 0
 
     macd_up_flag = 0
-    macd_down_flag = 0
+    macd_down_flag = 1
 
     order_quantity = 1
     # when trade complete, both buy and sell is done,
@@ -726,6 +726,7 @@ class OrderManager:
         def place_buy_order():
             print("====Placing Buy order ----")
             # to check when the trade is complete, if the trade is complete then no more trade is done.
+            # need to change the way trade completeion is handle, use a flag when the loop goes into the sell section.
             if running_quantity < 1 and not open_orders and self.order_signal_status < 1:
                 self.buy_trade_completed = 1
                 self.buy_order_pending = 0
@@ -736,13 +737,16 @@ class OrderManager:
                 if running_quantity < 1:
                     print("inside buy loop")
                     if not open_orders:
+                        print("Insde first buy order section")
                         self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
                         self.previous_buy_orders = self.buy_orders
                     elif open_orders and float(open_orders[0]['price']) < bid_price:
-                        print("Amending a the order")
-                        self.buy_orders.append({'price': bid_price, 'orderQty': order_quantity, 'side': "Buy"})
-                        self.previous_buy_orders = self.uy_orders
+                        print("Inside Amending a the order ot price= ",bid_price)
+                        self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                        self.previous_buy_orders = self.buy_orders
+                        print("previous_buy_orders variabel has value = ",self.previous_buy_orders)
                     elif open_orders:
+                        print("Inside No action required section")
                         self.buy_orders = self.previous_buy_orders
                 elif running_quantity >= 1:
                     print("inside sell loop")
@@ -795,7 +799,7 @@ class OrderManager:
 
         macd_based_order_generator()
 
-
+        print("Converging below ordersL:\n Buy Orders:", self.buy_orders, "\nSell Orders:",self.sell_orders)
 
 
         return self.converge_orders(self.buy_orders, self.sell_orders)
@@ -839,8 +843,8 @@ class OrderManager:
                 # Found an existing order. Do we need to amend it?
                 if desired_order['orderQty'] != order['leavesQty'] or (
                         # If price has changed, and the change is more than our RELIST_INTERVAL, amend.
-                        desired_order['price'] != order['price'] and
-                        abs((desired_order['price'] / order['price']) - 1) > settings.RELIST_INTERVAL):
+                        # additional comment, dont check for relist interval, ammend immediately.
+                        desired_order['price'] != order['price']):
                     to_amend.append({'orderID': order['orderID'], 'orderQty': order['cumQty'] + desired_order['orderQty'],
                                      'price': desired_order['price'], 'side': order['side']})
             except IndexError:

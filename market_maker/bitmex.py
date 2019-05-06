@@ -238,7 +238,7 @@ class BitMEX(object):
         # or you could change the clOrdID (set {"clOrdID": "new", "origClOrdID": "old"}) so that an amend
         # can't erroneously be applied twice.
         if max_retries is None: #this tends ot break if the market is volatile
-            max_retries = 0 if verb in ['POST', 'PUT'] else 3
+            max_retries = 200 if verb in ['POST', 'PUT'] else 200
 
         # Auth: API Key/Secret
         auth = APIKeyAuthWithExpires(self.apiKey, self.apiSecret)
