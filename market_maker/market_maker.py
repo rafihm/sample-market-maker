@@ -330,13 +330,14 @@ class OrderManager:
 # =-=-=--=-=-=-=-=-=-=-=-=-custom functions start==p-=-=-=-=-=-=-=-=--=
     def get_price_history(self, period=None, start_time=None, end_time=None):
         if period is None:
-            period = 1
+            period = 5
 
         if end_time is None:
             end_time = int(time.time())
         if start_time is None:
             # 48000 if period is 10 , 800 data points
-            start_time = end_time - 259200 #777600
+            start_time = end_time - 259200
+             #777600
             # one hour graph time with 30 days period
             # start_time = end_time - 2592000
         # for testnet
@@ -352,9 +353,10 @@ class OrderManager:
             #     exit(1)
 
         def retry():
-            self.retries += 1
-            if self.retries > max_retries:
-                raise Exception("Max retries on %s (%s) hit, raising." % (path, json.dumps(postdict or '')))
+            print("Retrying the request again . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ")
+            # self.retries += 1
+            # if self.retries > max_retries:
+                # raise Exception("Max retries on %s (%s) hit, raising." % (path, json.dumps(postdict or '')))
             return self.get_price_history()
 
         # Make the request
@@ -379,6 +381,9 @@ class OrderManager:
                     logger.error(postdict)
                 # Always exit, even if rethrow_errors, because this is fatal
                 exit(1)
+
+            elif response.status_code !=200:
+                return retry()
 
             # 404, can be thrown if order canceled or does not exist.
             elif response.status_code == 404:
@@ -446,7 +451,8 @@ class OrderManager:
                 # elif 'insufficient available balance' in message:
                 #     logger.error('Account out of funds. The message: %s' % error['message'])
                 #     exit_or_throw(Exception('Insufficient Funds'))
-
+            elif response.status.code !=200:
+                logger.error("Request failed with non 200 error code, retyring")
 
             # If we haven't returned or re-raised yet, we get here.
             logger.error("Unhandled Error: %s: %s" % (e, response.text))
@@ -475,28 +481,36 @@ class OrderManager:
         close_price_array = numpy.array(price_history['c'])
         # macd, macdsignal, macdhist = talib.MACD(close_price_array, fastperiod=12, slowperiod=26, signalperiod=9)
         macd, macdsignal, macdhist = talib.MACD(close_price_array, fastperiod=12, slowperiod=26, signalperiod=9)
-        # ema = talib.EMA(close_price_array, timeperiod=9)
+
+        sma = talib.SMA(macd, timeperiod=8)
 
         length = len(macd)
         print("leng=",length)
 
         # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
-        # print (ema)
+        # print (sma)
         # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
         macd_values = {
             "macd": macd[length-1],
             "macdsignal": macdsignal[length-1],
             "macdhist": macdhist[length-1]
         }
+        # print("Latest Price: epoc time", price_history['t'][length-5], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-5])), "Open=" ,price_history['o'][length-5], "High=", price_history['h'][length-5], "Low=", price_history['l'][length-5], "Close=", price_history['c'][length-5])
+        # print("Latest Price: epoc time", price_history['t'][length-4], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-4])), "Open=" ,price_history['o'][length-4], "High=", price_history['h'][length-4], "Low=", price_history['l'][length-4], "Close=", price_history['c'][length-4])
+        # print("Latest Price: epoc time", price_history['t'][length-3], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-3])), "Open=" ,price_history['o'][length-3], "High=", price_history['h'][length-3], "Low=", price_history['l'][length-3], "Close=", price_history['c'][length-3])
+        # print("Latest Price: epoc time", price_history['t'][length-2], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-2])), "Open=" ,price_history['o'][length-2], "High=", price_history['h'][length-2], "Low=", price_history['l'][length-2], "Close=", price_history['c'][length-2])
+        # print("Latest Price: epoc time", price_history['t'][length-1], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-1])), "Open=" ,price_history['o'][length-1], "High=", price_history['h'][length-1], "Low=", price_history['l'][length-1], "Close=", price_history['c'][length-1])
 
-        print("Latest Price: epoc time", price_history['t'][length-2], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-2])), "Open=" ,price_history['o'][length-2], "High=", price_history['h'][length-2], "Low=", price_history['l'][length-2], "Close=", price_history['c'][length-2])
-        print("Latest Price: epoc time", price_history['t'][length-1], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-1])), "Open=" ,price_history['o'][length-1], "High=", price_history['h'][length-1], "Low=", price_history['l'][length-1], "Close=", price_history['c'][length-1])
-        print("Previous MACD = Macd=",macd[length-5]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-5])
-        print("Previous MACD = Macd=",macd[length-4]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-4])
-        print("Previous MACD = Macd=",macd[length-3]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-3])
-        print("Previous MACD = Macd=",macd[length-2]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-2])
-        print("Current MACD = Macd=",macd[length-1]," macdsignal=",macdsignal[length-1],"macdhist=",macdhist[length-1])
+        # print("\nPrevious MACD = ", price_history['t'][length-5], " Macd=",macd[length-5]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-5])
+        # print("Previous MACD = ", price_history['t'][length-4], " Macd=",macd[length-4]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-4])
+        # print("Previous MACD = ", price_history['t'][length-3], " Macd=",macd[length-3]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-3])
+        # print("Previous MACD = ", price_history['t'][length-2], " Macd=",macd[length-2]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-2])
+        # print("Current MACD = ", price_history['t'][length-1], " Macd=",macd[length-1]," macdsignal=",macdsignal[length-1],"macdhist=",macdhist[length-1])
 
+        for i in range(60):
+            i += 1
+            print("Latest Price: epoc time", price_history['t'][length-i], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-i])), "Open=" ,price_history['o'][length-i], "High=", price_history['h'][length-i], "Low=", price_history['l'][length-i], "Close=", price_history['c'][length-i])
+            print("Current MACD = ", price_history['t'][length-i], " Macd=",macd[length-i]," macdsignal=",macdsignal[length-i]," macdsignal_SMA=",sma[length-i]," macdhist=",macdhist[length-i], "\n")
 
         return macd_values
     #-=-=-=-=-=-=-=-=-=custom functions end-----0-=-=-=-=-=--=
@@ -682,7 +696,7 @@ class OrderManager:
 
         def get_order_singal():
             macd_values = self.get_current_macd_value()
-            print("MACD Values from functions = ", macd_values)
+            # print("MACD Values from functions = ", macd_values)
             if self.macd_up_flag == 0 and self.macd_down_flag ==0:
                 if macd_values['macd'] > macd_values['macdsignal']:
                     self.macd_up_flag = 1
@@ -732,7 +746,12 @@ class OrderManager:
                         self.buy_orders = self.previous_buy_orders
                 elif running_quantity >= 1:
                     print("inside sell loop")
-                    pl_delta = ask_price - position["avgEntryPrice"]
+                    # if the sell is completed withing the next loop then position["avgEntryPrice"] has null value which throws exception
+                    try:
+                        pl_delta = ask_price - position["avgEntryPrice"]
+                    except Exception as e:
+                        return None
+
                     print ("Delta Price = ",pl_delta)
                     if not open_orders and position["avgEntryPrice"] < ask_price:
                         print("placing the initial sell order")
