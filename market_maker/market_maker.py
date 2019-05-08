@@ -330,7 +330,7 @@ class OrderManager:
 # =-=-=--=-=-=-=-=-=-=-=-=-custom functions start==p-=-=-=-=-=-=-=-=--=
     def get_price_history(self, period=None, start_time=None, end_time=None):
         if period is None:
-            period = 5
+            period = 1
 
         if end_time is None:
             end_time = int(time.time())
@@ -341,7 +341,7 @@ class OrderManager:
             # one hour graph time with 30 days period
             # start_time = end_time - 2592000
         # for testnet
-        print("Start Time=", start_time, "Endtime = ", end_time)
+        # print("Start Time=", start_time, "Endtime = ", end_time)
         # url = 'https://testnet.bitmex.com/api/udf/history?symbol=XBTUSD&resolution=' + str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
         #uncomment if for real trading
         url = 'https://www.bitmex.com/api/udf/history?symbol=XBTUSD&resolution='+ str(period) + '&from=' + str(start_time) + '&to=' + str(end_time)
@@ -362,7 +362,7 @@ class OrderManager:
         # Make the request
         response = None
         try:
-            logger.info("sending req to %s" % (url))
+            # logger.info("sending req to %s" % (url))
             response = requests.get(url)
             # prepped = self.session.prepare_request(req)
             # response = self.session.send(prepped, timeout=timeout)
@@ -397,24 +397,6 @@ class OrderManager:
             # 429, ratelimit; cancel orders & wait until X-RateLimit-Reset
             elif response.status_code == 429:
                 logger.error("Request Failed with the Error code 429")
-                # logger.error("Ratelimited on current request. Sleeping, then trying again. Try fewer " +
-                #                   "order pairs or contact support@bitmex.com to raise your limits. " +
-                #                   "Request: %s \n %s" % (url, json.dumps(postdict)))
-
-                # # Figure out how long we need to wait.
-                # ratelimit_reset = response.headers['X-RateLimit-Reset']
-                # to_sleep = int(ratelimit_reset) - int(time.time())
-                # reset_str = datetime.datetime.fromtimestamp(int(ratelimit_reset)).strftime('%X')
-
-                # # We're ratelimited, and we may be waiting for a long time. Cancel orders.
-                # logger.warning("Canceling all known orders in the meantime.")
-                # cancel([o['orderID'] for o in self.open_orders()])
-
-                # logger.error("Your ratelimit will reset at %s. Sleeping for %d seconds." % (reset_str, to_sleep))
-                # time.sleep(to_sleep)
-
-                # # Retry the request.
-                # return retry()
 
             # 503 - BitMEX temporary downtime, likely due to a deploy. Try again
             elif response.status_code == 503:
@@ -426,31 +408,7 @@ class OrderManager:
 
             elif response.status_code == 400:
                 logger.error("Request Failed with the Error code 400")
-                # error = response.json()['error']
-                # message = error['message'].lower() if error else ''
 
-                # # Duplicate clOrdID: that's fine, probably a deploy, go get the order(s) and return it
-                # if 'duplicate clordid' in message:
-                #     orders = postdict['orders'] if 'orders' in postdict else postdict
-
-                #     IDs = json.dumps({'clOrdID': [order['clOrdID'] for order in orders]})
-                #     orderResults = self._curl_bitmex('/order', query={'filter': IDs}, verb='GET')
-
-                #     for i, order in enumerate(orderResults):
-                #         if (
-                #                 order['orderQty'] != abs(postdict['orderQty']) or
-                #                 order['side'] != ('Buy' if postdict['orderQty'] > 0 else 'Sell') or
-                #                 order['price'] != postdict['price'] or
-                #                 order['symbol'] != postdict['symbol']):
-                #             raise Exception('Attempted to recover from duplicate clOrdID, but order returned from API ' +
-                #                             'did not match POST.\nPOST data: %s\nReturned order: %s' % (
-                #                                 json.dumps(orders[i]), json.dumps(order)))
-                #     # All good
-                #     return orderResults
-
-                # elif 'insufficient available balance' in message:
-                #     logger.error('Account out of funds. The message: %s' % error['message'])
-                #     exit_or_throw(Exception('Insufficient Funds'))
             elif response.status.code !=200:
                 logger.error("Request failed with non 200 error code, retyring")
 
@@ -475,7 +433,7 @@ class OrderManager:
         return response.json()
 
     def get_current_macd_value(self):
-        logger.info("Calculating the current MACD Value")
+        # logger.info("Calculating the current MACD Value")
         price_history = self.get_price_history()
         # print(price_history)
         close_price_array = numpy.array(price_history['c'])
@@ -490,24 +448,14 @@ class OrderManager:
         # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
         # print (sma)
         # print("=-=-=-=-=-=-=-=-=-=-=printitng EMA")
+        # -2 gives the previous macd value, latest macd value can fluctuate with price.
         macd_values = {
-            "macd": macd[length-1],
-            "macdsignal": macdsignal[length-1],
-            "macdhist": macdhist[length-1]
+            "macd": macd[length-2],
+            "macdsignal": macdsignal[length-2],
+            "macdhist": macdhist[length-2]
         }
-        # print("Latest Price: epoc time", price_history['t'][length-5], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-5])), "Open=" ,price_history['o'][length-5], "High=", price_history['h'][length-5], "Low=", price_history['l'][length-5], "Close=", price_history['c'][length-5])
-        # print("Latest Price: epoc time", price_history['t'][length-4], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-4])), "Open=" ,price_history['o'][length-4], "High=", price_history['h'][length-4], "Low=", price_history['l'][length-4], "Close=", price_history['c'][length-4])
-        # print("Latest Price: epoc time", price_history['t'][length-3], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-3])), "Open=" ,price_history['o'][length-3], "High=", price_history['h'][length-3], "Low=", price_history['l'][length-3], "Close=", price_history['c'][length-3])
-        # print("Latest Price: epoc time", price_history['t'][length-2], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-2])), "Open=" ,price_history['o'][length-2], "High=", price_history['h'][length-2], "Low=", price_history['l'][length-2], "Close=", price_history['c'][length-2])
-        # print("Latest Price: epoc time", price_history['t'][length-1], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-1])), "Open=" ,price_history['o'][length-1], "High=", price_history['h'][length-1], "Low=", price_history['l'][length-1], "Close=", price_history['c'][length-1])
 
-        # print("\nPrevious MACD = ", price_history['t'][length-5], " Macd=",macd[length-5]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-5])
-        # print("Previous MACD = ", price_history['t'][length-4], " Macd=",macd[length-4]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-4])
-        # print("Previous MACD = ", price_history['t'][length-3], " Macd=",macd[length-3]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-3])
-        # print("Previous MACD = ", price_history['t'][length-2], " Macd=",macd[length-2]," macdsignal=",macdsignal[length-2],"macdhist=",macdhist[length-2])
-        # print("Current MACD = ", price_history['t'][length-1], " Macd=",macd[length-1]," macdsignal=",macdsignal[length-1],"macdhist=",macdhist[length-1])
-
-        for i in range(3):
+        for i in range(2):
             i += 1
             print("Latest Price: epoc time", price_history['t'][length-i], "Time=", time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(price_history['t'][length-i])), "Open=" ,price_history['o'][length-i], "High=", price_history['h'][length-i], "Low=", price_history['l'][length-i], "Close=", price_history['c'][length-i])
             print("Current MACD = ", price_history['t'][length-i], " Macd=",macd[length-i]," macdsignal=",macdsignal[length-i]," macdsignal_SMA=",sma[length-i]," macdhist=",macdhist[length-i], "\n")
@@ -519,6 +467,8 @@ class OrderManager:
     # Orders
     ###
 
+    macd_delay_counter = 0
+
     previous_buy_orders = []
     previous_sell_orders = []
     buy_orders = []
@@ -526,9 +476,9 @@ class OrderManager:
     loop_count = 0
 
     macd_up_flag = 0
-    macd_down_flag = 1
+    macd_down_flag = 0
 
-    order_quantity = 1
+    order_quantity = 100
     # when trade complete, both buy and sell is done,
     buy_trade_completed = 0
     sell_trade_completed = 0
@@ -536,6 +486,9 @@ class OrderManager:
     buy_order_pending = 0
     sell_order_pending = 0
 
+    sell_order_placed = 0
+
+    order_signal_status = -1
 
     def place_orders(self):
         """Create order items for use in convergence."""
@@ -724,61 +677,76 @@ class OrderManager:
                 
 
         def place_buy_order():
-            print("====Placing Buy order ----")
+            print("Inside Long Order Functions")
             # to check when the trade is complete, if the trade is complete then no more trade is done.
-            # need to change the way trade completeion is handle, use a flag when the loop goes into the sell section.
-            if running_quantity < 1 and not open_orders and self.order_signal_status < 1:
-                self.buy_trade_completed = 1
+            # need to change the way trade completeion is handled, use a flag when the loop goes into the sell section.
+            print("Running Qantity=",running_quantity," open_orders=",open_orders," order_signal_status=",self.order_signal_status, "buy_order_pending=",self.buy_order_pending, " buy_trade_completed=",self.buy_trade_completed)
+            if running_quantity < 1 and not open_orders and self.sell_order_placed == 1:
+                # self.buy_trade_completed = 1
+                self.sell_order_placed = 0
                 self.buy_order_pending = 0
                 print("---Inside order completed loop")
+                return
 
-            if not self.buy_trade_completed:
-                print("inside order not completed loop")
-                if running_quantity < 1:
-                    print("inside buy loop")
-                    if not open_orders:
-                        print("Insde first buy order section")
-                        self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
-                        self.previous_buy_orders = self.buy_orders
-                    elif open_orders and float(open_orders[0]['price']) < bid_price:
-                        print("Inside Amending a the order ot price= ",bid_price)
-                        self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
-                        self.previous_buy_orders = self.buy_orders
-                        print("previous_buy_orders variabel has value = ",self.previous_buy_orders)
-                    elif open_orders:
-                        print("Inside No action required section")
-                        self.buy_orders = self.previous_buy_orders
-                elif running_quantity >= 1:
-                    print("inside sell loop")
-                    # if the sell is completed withing the next loop then position["avgEntryPrice"] has null value which throws exception
-                    try:
-                        pl_delta = ask_price - position["avgEntryPrice"]
-                    except Exception as e:
-                        return None
+            # if not self.buy_trade_completed:
+            print("inside order not completed Section")
+            if running_quantity < 1:
+                print("inside buy loop")
+                if not open_orders:
+                    print("Insde first buy order section")
+                    self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                elif open_orders and float(open_orders[0]['price']) < bid_price:
+                    print("Inside Amending a the order ot price= ",bid_price)
+                    self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                    print("previous_buy_orders variabel has value = ",self.previous_buy_orders)
+                elif open_orders:
+                    print("Inside No action required section")
+                    self.buy_orders = self.previous_buy_orders
+            elif running_quantity >= 1:
+                print("inside sell loop")
+                self.sell_order_placed = 1
+                # if the sell is completed withing the next loop then position["avgEntryPrice"] has null value which throws exception
+                try:
+                    pl_delta = ask_price - position["avgEntryPrice"]
+                except Exception as e:
+                    return None
 
-                    print ("Delta Price = ",pl_delta)
-                    if not open_orders and position["avgEntryPrice"] < ask_price:
-                        print("placing the initial sell order")
-                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
-                        self.previous_sell_orders = self.sell_orders
-                    elif open_orders and float(open_orders[0]['price']) > ask_price and position["avgEntryPrice"] < ask_price:
-                        print("open order with greater than ask price.")
-                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
-                        self.previous_sell_orders = self.sell_orders
-                    elif pl_delta <= -10 or self.macd_down_flag == 1:
-                        print("inside stoploss loop")
-                        self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
-                        self.previous_sell_orders = self.sell_orders
-                    elif open_orders:
-                        print(" no action to sell order")
-                        self.sell_orders = self.previous_sell_orders
+                print ("Delta Price = ",pl_delta)
+                if not open_orders and position["avgEntryPrice"] <= ask_price:
+                    print("placing the initial sell order")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders and float(open_orders[0]['price']) > ask_price and position["avgEntryPrice"] <= ask_price:
+                    print("Ammend the sell order. open order with greater than ask price.")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif pl_delta <= -10 or self.macd_down_flag == 1:
+                    print("inside stoploss loop")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders:
+                    print(" no action to sell order")
+                    self.sell_orders = self.previous_sell_orders
 
         def place_sell_order():
             print("Placing Sell order ----")
 
 
         def macd_based_order_generator():
-            self.order_signal_status = get_order_singal()
+            self.macd_delay_counter += 1
+            if self.macd_delay_counter >= 15:
+                self.macd_delay_counter = get_order_singal()
+                print("macd_delay_counter value is ",self.macd_delay_counter)
+                self.macd_delay_counter = 0
+                # sleep(20)
+
+            if self.macd_up_flag:
+                print("Currently in uptreand. No action required")
+            if self.macd_down_flag:
+                print("Currently in DownTrend. No action required")
+
             if self.order_signal_status == 1:
                 print ("UPTREND, action need to be taken. Placing order now")
                 place_buy_order()
@@ -786,15 +754,18 @@ class OrderManager:
             # elif self.order_signal_status == -1:
             #     print("DownTrend, action needs to be taken")
             else:
-                print("price is constant-No action needed .coool")
+                print("No MACD UP Cross-Over Signal")
                 if self.buy_order_pending == 1:
                     #if buy order not completed then call the buy order.
-                    if self.buy_trade_completed == 0:
-                        place_buy_order()
-                    else:
-                        # change the buy order completed to false , so that next order can be placed
-                        self.buy_trade_completed = 0
-                    print("already sent for buying, need call again")
+                    place_buy_order()
+                    # if self.buy_trade_completed == 0:
+                    #     place_buy_order()
+                    # else:
+                    #     # change the buy order completed to false , so that next order can be placed
+                    #     self.buy_trade_completed = 0
+                    # # print("already sent for buying, need call again")
+
+                return
 
 
         macd_based_order_generator()
