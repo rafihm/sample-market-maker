@@ -722,7 +722,7 @@ class OrderManager:
                     print("Ammend the sell order. open order with greater than ask price.")
                     self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
                     self.previous_sell_orders = self.sell_orders
-                elif pl_delta <= -10 or self.macd_down_flag == 1:
+                elif pl_delta <= -1 or self.macd_down_flag == 1:
                     print("inside stoploss loop")
                     self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
                     self.previous_sell_orders = self.sell_orders
@@ -737,7 +737,7 @@ class OrderManager:
         def macd_based_order_generator():
             self.macd_delay_counter += 1
             if self.macd_delay_counter >= 15:
-                self.macd_delay_counter = get_order_singal()
+                self.order_signal_status = get_order_singal()
                 print("macd_delay_counter value is ",self.macd_delay_counter)
                 self.macd_delay_counter = 0
                 # sleep(20)
