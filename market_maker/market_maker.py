@@ -478,7 +478,7 @@ class OrderManager:
     macd_up_flag = 0
     macd_down_flag = 0
 
-    order_quantity = 100
+    order_quantity = 1
     # when trade complete, both buy and sell is done,
     buy_trade_completed = 0
     sell_trade_completed = 0
@@ -487,6 +487,7 @@ class OrderManager:
     sell_order_pending = 0
 
     sell_order_placed = 0
+    buy_order_placed = 0
 
     order_signal_status = -1
 
@@ -556,6 +557,8 @@ class OrderManager:
         ask_price = ticker['sell']
         mid_price = ticker['mid']
         position = self.exchange.get_position()
+        print("Printing current Order book ifno bid_price, ask_price, mid_price= ",bid_price,ask_price,mid_price)
+        # print("dumps current postion info", position)
         print("-=-=-=-=-=-=-=open positions is = current qty",position['currentQty'], " avg entyr price=", position["avgEntryPrice"], "-=-=-=-=-=-=-=")
         open_orders = self.exchange.get_orders()
         running_quantity = self.exchange.get_delta()
@@ -722,13 +725,131 @@ class OrderManager:
                     print("Ammend the sell order. open order with greater than ask price.")
                     self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
                     self.previous_sell_orders = self.sell_orders
-                elif pl_delta <= -1 or self.macd_down_flag == 1:
+                elif pl_delta <= -10 or self.macd_down_flag == 1:
                     print("inside stoploss loop")
                     self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
                     self.previous_sell_orders = self.sell_orders
                 elif open_orders:
                     print(" no action to sell order")
                     self.sell_orders = self.previous_sell_orders
+
+# stratey used +5 for profit and macd crossover for stoploss
+        def place_buy_order_strat_1():
+            print("Inside Long Order Functions")
+            # to check when the trade is complete, if the trade is complete then no more trade is done.
+            # need to change the way trade completeion is handled, use a flag when the loop goes into the sell section.
+            print("Running Qantity=",running_quantity," open_orders=",open_orders," order_signal_status=",self.order_signal_status, "buy_order_pending=",self.buy_order_pending, " buy_trade_completed=",self.buy_trade_completed)
+            if running_quantity < 1 and not open_orders and self.sell_order_placed == 1:
+                # self.buy_trade_completed = 1
+                self.sell_order_placed = 0
+                self.buy_order_pending = 0
+                print("---Inside order completed loop")
+                return
+
+            # if not self.buy_trade_completed:
+            print("inside order not completed Section")
+            if running_quantity < 1:
+                print("inside buy loop")
+                if not open_orders:
+                    print("Insde first buy order section")
+                    self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                elif open_orders and float(open_orders[0]['price']) < bid_price:
+                    print("Inside Amending a the order ot price= ",bid_price)
+                    self.buy_orders.append({'price': bid_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                    print("previous_buy_orders variabel has value = ",self.previous_buy_orders)
+                elif open_orders:
+                    print("Inside No action required section")
+                    self.buy_orders = self.previous_buy_orders
+            elif running_quantity >= 1:
+                print("inside sell loop")
+                self.sell_order_placed = 1
+                # if the sell is completed withing the next loop then position["avgEntryPrice"] has null value which throws exception
+                try:
+                    pl_delta = ask_price - position["avgEntryPrice"]
+                except Exception as e:
+                    return None
+
+                print ("Delta Price = ",pl_delta)
+                if not open_orders:
+                    print("placing the initial sell order")
+                    self.sell_orders.append({'price': position["avgEntryPrice"]+10, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif pl_delta <= -30 or self.macd_down_flag == 1:
+                    print("inside stoploss loop")
+                    self.sell_orders.append({'price': ask_price, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders:
+                    print(" no action to sell order")
+                    self.sell_orders = self.previous_sell_orders
+
+
+# macd strategy uses market orders.
+        def place_buy_order_market_orders_strat():
+            running_quantity = self.exchange.get_delta()
+            http_open_orders = self.bitmex.http_open_orders()
+            print("Inside Long Order Functions")
+            # to check when the trade is complete, if the trade is complete then no more trade is done.
+            # need to change the way trade completeion is handled, use a flag when the loop goes into the sell section.
+            print("Running Qantity=",running_quantity," open_orders=",http_open_orders," order_signal_status=",self.order_signal_status, "buy_order_pending=",self.buy_order_pending, " buy_trade_completed=",self.buy_trade_completed)
+            if running_quantity < 1 and not http_open_orders and self.sell_order_placed == 1:
+                # self.buy_trade_completed = 1
+                self.sell_order_placed = 0
+                self.buy_order_pending = 0
+                print("---Inside order completed loop")
+                return
+
+            # if not self.buy_trade_completed:
+            print("inside order not completed Section")
+            if running_quantity < 1 :
+                print("inside buy loop")
+                http_open_orders = self.bitmex.http_open_orders()
+                print("prining HTTP Open orders===",http_open_orders)
+
+                if not http_open_orders:
+                    print("Insde first buy order section")
+                    self.buy_orders.append({'price': ask_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                    self.previous_buy_orders = self.buy_orders
+                # elif open_orders and float(open_orders[0]['price']) < bid_price:
+                #     print("Inside Amending a the order ot price= ",bid_price)
+                #     self.buy_orders.append({'price': ask_price, 'orderQty': self.order_quantity, 'side': "Buy"})
+                #     self.previous_buy_orders = self.buy_orders
+                #     print("previous_buy_orders variabel has value = ",self.previous_buy_orders)
+
+                # open order present but and no buy is done. 
+                elif http_open_orders and self.exchange.get_delta() < 1:
+                    print("Inside No action required section")
+                    self.buy_orders = self.previous_buy_orders
+
+
+            elif running_quantity >= 1:
+                print("inside sell loop")
+                self.sell_order_placed = 1
+                # if the sell is completed withing the next loop then position["avgEntryPrice"] has null value which throws exception
+                try:
+                    pl_delta = ask_price - int(position["avgEntryPrice"])
+                except Exception as e:
+                    return None
+
+                print ("Delta Price = ",pl_delta)
+                if not open_orders:
+                    print("placing the initial sell order")
+                    self.sell_orders.append({'price': int(position["avgEntryPrice"])+5, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                # elif open_orders and float(open_orders[0]['price']) > ask_price and position["avgEntryPrice"] <= ask_price:
+                #     print("Ammend the sell order. open order with greater than ask price.")
+                #     self.sell_orders.append({'price': bid_price, 'orderQty': running_quantity, 'side': "Sell"})
+                #     self.previous_sell_orders = self.sell_orders
+                elif self.macd_down_flag == 1:
+                    print("inside stoploss loop")
+                    self.sell_orders.append({'price': bid_price, 'orderQty': running_quantity, 'side': "Sell"})
+                    self.previous_sell_orders = self.sell_orders
+                elif open_orders:
+                    print(" no action to sell order")
+                    self.sell_orders = self.previous_sell_orders
+
+
 
         def place_sell_order():
             print("Placing Sell order ----")
@@ -757,7 +878,7 @@ class OrderManager:
                 print("No MACD UP Cross-Over Signal")
                 if self.buy_order_pending == 1:
                     #if buy order not completed then call the buy order.
-                    place_buy_order()
+                    place_buy_order_market_orders_strat()
                     # if self.buy_trade_completed == 0:
                     #     place_buy_order()
                     # else:
@@ -774,6 +895,9 @@ class OrderManager:
 
 
         return self.converge_orders(self.buy_orders, self.sell_orders)
+
+
+
 
     def prepare_order(self, index):
         """Create an order object."""
